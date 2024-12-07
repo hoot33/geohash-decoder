@@ -8,8 +8,8 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install --production
 
-# Copy src directory
-COPY src/ ./src/
+# Copy all source files
+COPY . .
 
 # Make sure port 8080 is available
 EXPOSE 8080
@@ -17,5 +17,5 @@ EXPOSE 8080
 # Set the environment variable
 ENV PORT=8080
 
-# Start the application (now referencing src/server.js)
-CMD ["node", "src/server.js"]
+# Start the application
+CMD ["npm", "start"]
