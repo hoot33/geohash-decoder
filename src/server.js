@@ -2,63 +2,76 @@ const express = require('express');
 const Geohash = require('latlon-geohash');
 const app = express();
 
-// Log startup environment
-console.log('Starting server with environment:', {
-  PORT: process.env.PORT,
-  NODE_ENV: process.env.NODE_ENV,
-  PWD: process.env.PWD
+// Unhandled error logging
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (err) => {
+    console.error('Unhandled Rejection:', err);
+});
+
+// Add request logging
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    next();
 });
 
 app.use(express.json());
-console.log('Express middleware configured');
+
+// Basic root endpoint
+app.get('/', (req, res) => {
+    res.json({ status: 'ok' });
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  console.log('Health check requested');
-  res.json({ status: 'healthy' });
-});
-
-// Root endpoint
-app.get('/', (req, res) => {
-  console.log('Root endpoint requested');
-  res.json({ status: 'running' });
+    res.json({ status: 'healthy' });
 });
 
 // Decode geohash endpoint
 app.get('/decode/:geohash', (req, res) => {
-  console.log('Decode requested for:', req.params.geohash);
-  try {
-    const geohash = req.params.geohash;
-    
-    if (!geohash || typeof geohash !== 'string' || geohash.length === 0) {
-      return res.status(400).json({
-        error: 'Invalid geohash provided'
-      });
-    }
+    try {
+        const geohash = req.params.geohash;
+        console.log('Decoding geohash:', geohash);
+        
+        if (!geohash) {
+            return res.status(400).json({ error: 'Geohash is required' });
+        }
 
-    const decoded = Geohash.decode(geohash);
-    
-    res.json({
-      coordinates: {
-        lat: decoded.lat,
-        lng: decoded.lon
-      },
-      geohash: geohash
-    });
-  } catch (error) {
-    console.error('Decoding error:', error);
-    res.status(500).json({
-      error: 'Failed to decode geohash'
-    });
-  }
+        const decoded = Geohash.decode(geohash);
+        
+        res.json({
+            coordinates: {
+                lat: decoded.lat,
+                lng: decoded.lon
+            },
+            geohash: geohash
+        });
+    } catch (error) {
+        console.error('Error decoding geohash:', error);
+        res.status(500).json({ error: 'Failed to decode geohash' });
+    }
 });
 
+// Server startup
 const port = process.env.PORT || 8080;
-console.log(`Starting server on port ${port}`);
 
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Server is running on port ${port}`);
+const server = app.listen(port, '0.0.0.0', () => {
+    console.log(`Server running at http://0.0.0.0:${port}/`);
 }).on('error', (error) => {
-  console.error('Failed to start server:', error);
-  process.exit(1);
+    console.error('Server startup error:', error);
+    // Don't exit immediately
+    setTimeout(() => {
+        process.exit(1);
+    }, 1000);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('SIGTERM received. Shutting down gracefully...');
+    server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+    });
 });
